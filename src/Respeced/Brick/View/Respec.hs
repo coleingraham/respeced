@@ -3,6 +3,7 @@
 module Respeced.Brick.View.Respec where
 
 import           Respeced.Actor
+import           Respeced.Stat
 import           Respeced.Brick.State
 
 import qualified Brick.Main           as M
@@ -13,6 +14,8 @@ import qualified Brick.Widgets.Core   as W
 import qualified Brick.Widgets.Dialog as D
 import qualified Brick.Widgets.Edit   as E
 import qualified Brick.Widgets.List   as L
+import qualified Data.HashMap.Strict  as HM
+import           Data.List
 import           Data.Monoid
 import qualified Graphics.Vty         as V
 import           Text.Printf          (printf)
@@ -33,33 +36,38 @@ drawUI rs = [ui]
             $ W.vBox [ttl]
         lbl = W.str "Respec"
         ttl = C.center $ W.vBox
-              [W.str "Respec Character Here"
+              [W.str $ actorName $ playerActor rs
               ,actorStatsUI rs]
 
 actorStatsUI :: RespecState -> T.Widget View
-actorStatsUI rs = B.borderWithLabel (W.str $ actorName a)
-                $ W.hBox [W.vBox lst,stats]
+actorStatsUI rs = ui
     where
-        p :: Int -> String
-        p   = printf "%3d"
+        p     = printf "%3d"
+        a     = playerActor rs
+        s     = currentStats a
 
-        a   = playerActor rs
-        s   = currentStats a
-        lst = [W.str $ "Unused Stat Points: " <> show (unStatPoint $ unusedStatPoints a)
-              ,W.str $ "Current Preset: " <> unStatPreset (activePreset a)
-              ,W.str "(the letter increases the stat)"
-              ,W.str "(shift+letter decreases the stat)"
-              ,W.str "(z resets all stats to 1)"]
+        ui    = W.hBox [left,right]
+
+        left  = W.vBox stng
+        stng  = [W.str $ "Unused Stat Points: " <> show (unStatPoint $ unusedStatPoints a)
+                ,W.str $ "Current Preset: "     <> unStatPreset (activePreset a)]
+
+        right = W.vBox [stats,notes]
+
         stats = B.borderWithLabel (W.str "Stats")
               $ W.vBox
-              [W.str $ "              HP (q) " <> p (unHP      $ hp              s)
-              ,W.str $ "              MP (w) " <> p (unMP      $ mp              s)
-              ,W.str $ "         Stamina (e) " <> p (unStamina $ stamina         s)
-              ,W.str $ "Physical Offense (r) " <> p (unOffense $ physicalOffense s)
-              ,W.str $ "Physical Defense (a) " <> p (unDefense $ physicalDefense s)
-              ,W.str $ "  Macgic Offense (s) " <> p (unOffense $ magicOffense    s)
-              ,W.str $ "  Macgic Defense (d) " <> p (unDefense $ magicDefense    s)
-              ,W.str $ "           Speed (f) " <> p (unSpeed   $ speed           s)]
+              [W.str   "                     (+/-)"
+              ,W.str $ "              HP:" <> p (unHP      $ hp              s) <> " (q/Q)"
+              ,W.str $ "              MP:" <> p (unMP      $ mp              s) <> " (w/W)"
+              ,W.str $ "         Stamina:" <> p (unStamina $ stamina         s) <> " (e/E)"
+              ,W.str $ "Physical Offense:" <> p (unOffense $ physicalOffense s) <> " (r/R)"
+              ,W.padTop (T.Pad 1)
+              $W.str $ "Physical Defense:" <> p (unDefense $ physicalDefense s) <> " (a/A)"
+              ,W.str $ "  Macgic Offense:" <> p (unOffense $ magicOffense    s) <> " (s/S)"
+              ,W.str $ "  Macgic Defense:" <> p (unDefense $ magicDefense    s) <> " (d/D)"
+              ,W.str $ "           Speed:" <> p (unSpeed   $ speed           s) <> " (f/F)"]
+
+        notes = W.vBox [W.str "(z resets all stats to 1)"]
 
 updateStat
     :: (Actor -> ActorUpdate)
@@ -76,6 +84,13 @@ handleEvent
     -> T.EventM View (T.Next RespecState)
 handleEvent rs (T.VtyEvent (V.EvKey V.KEsc []))
     = M.halt (setScreen Exit rs)
+
+handleEvent rs (T.VtyEvent (V.EvKey (V.KChar '>') []))
+    = M.continue rs
+    where
+        a  = playerActor rs
+        p  = activePreset a
+        ps = sort $ delete p $ HM.keys $ statPresets a
 
 handleEvent rs (T.VtyEvent (V.EvKey (V.KChar 'q') []))
     = M.continue $ updateStat increaseHP rs

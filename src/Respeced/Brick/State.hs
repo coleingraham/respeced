@@ -7,11 +7,12 @@ import           Respeced.Actor
 import qualified Brick.AttrMap        as A
 import qualified Brick.Main           as M
 import qualified Brick.Types          as T
-import qualified Data.Text            as T
+import qualified Data.HashMap.Strict  as HM
+import           Data.List
 import qualified Graphics.Vty         as V
 
 -- |This is how brick keeps track of where the cursor focus is.
-type View = T.Text
+type View = String
 
 vTextEdit :: View
 vTextEdit = "text_edit"
@@ -29,6 +30,9 @@ data Screen
     | Respec
     | Combat [Actor] -- ^which 'Actor's you are fighting
     deriving (Show,Eq)
+
+--respec :: Actor -> Screen
+--respec = Respec . zip [0..] . sort . HM.keys . statPresets
 
 -- |The state used for all brick things.
 data RespecState = RespecState {
