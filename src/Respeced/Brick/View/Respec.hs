@@ -49,25 +49,30 @@ actorStatsUI rs = ui
         ui    = W.hBox [left,right]
 
         left  = W.vBox stng
-        stng  = [W.str $ "Unused Stat Points: " <> show (unStatPoint $ unusedStatPoints a)
-                ,W.str $ "Current Preset: "     <> unStatPreset (activePreset a)]
+        stng  = [ W.padTop (T.Pad 1)
+                $ W.str $ "Unused Stat Points: " <> p (unStatPoint $ unusedStatPoints a)
+                , W.str $ "    Current Preset: "
+                  <> show (unStatPreset $ activePreset a)
+                  <> "/"
+                  <> show (unMaxPresets $ maxPresets a)]
 
         right = W.vBox [stats,notes]
 
         stats = B.borderWithLabel (W.str "Stats")
               $ W.vBox
-              [W.str   "                     (+/-)"
-              ,W.str $ "              HP:" <> p (unHP      $ hp              s) <> " (q/Q)"
-              ,W.str $ "              MP:" <> p (unMP      $ mp              s) <> " (w/W)"
-              ,W.str $ "         Stamina:" <> p (unStamina $ stamina         s) <> " (e/E)"
-              ,W.str $ "Physical Offense:" <> p (unOffense $ physicalOffense s) <> " (r/R)"
-              ,W.padTop (T.Pad 1)
-              $W.str $ "Physical Defense:" <> p (unDefense $ physicalDefense s) <> " (a/A)"
-              ,W.str $ "  Macgic Offense:" <> p (unOffense $ magicOffense    s) <> " (s/S)"
-              ,W.str $ "  Macgic Defense:" <> p (unDefense $ magicDefense    s) <> " (d/D)"
-              ,W.str $ "           Speed:" <> p (unSpeed   $ speed           s) <> " (f/F)"]
+              [ W.str   "                     (+/-)"
+              , W.str $ "              HP:" <> p (unHP      $ hp              s) <> " (q/Q)"
+              , W.str $ "              MP:" <> p (unMP      $ mp              s) <> " (w/W)"
+              , W.str $ "         Stamina:" <> p (unStamina $ stamina         s) <> " (e/E)"
+              , W.str $ "Physical Offense:" <> p (unOffense $ physicalOffense s) <> " (r/R)"
+              , W.padTop (T.Pad 1)
+              $ W.str $ "Physical Defense:" <> p (unDefense $ physicalDefense s) <> " (a/A)"
+              , W.str $ "  Macgic Offense:" <> p (unOffense $ magicOffense    s) <> " (s/S)"
+              , W.str $ "  Macgic Defense:" <> p (unDefense $ magicDefense    s) <> " (d/D)"
+              , W.str $ "           Speed:" <> p (unSpeed   $ speed           s) <> " (f/F)"]
 
-        notes = W.vBox [W.str "(z resets all stats to 1)"]
+        notes = W.vBox [W.str "z resets all stats to 1"
+                       ,W.str ",/. change between presets"]
 
 updateStat
     :: (Actor -> ActorUpdate)
@@ -144,5 +149,15 @@ handleEvent rs (T.VtyEvent (V.EvKey (V.KChar 'z') []))
     = M.continue $ rs { playerActor = a }
     where
         a = setStats baseStats $ playerActor rs
+
+handleEvent rs (T.VtyEvent (V.EvKey (V.KChar ',') []))
+    = M.continue $ rs { playerActor = a }
+    where
+        a = fst $ applyActorUpdate prevPreset $ playerActor rs
+
+handleEvent rs (T.VtyEvent (V.EvKey (V.KChar '.') []))
+    = M.continue $ rs { playerActor = a }
+    where
+        a = fst $ applyActorUpdate nextPreset $ playerActor rs
 
 handleEvent rs _ = M.continue rs

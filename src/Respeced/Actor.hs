@@ -10,9 +10,10 @@ module Respeced.Actor (
 ,Actor(..)
 ,currentStats
 ,addPreset
-,deletePreset
 ,ActorUpdate
 ,setActivePreset
+,nextPreset
+,prevPreset
 ,setStats
 -- *Increasing stats
 ,increaseHP
@@ -46,8 +47,12 @@ import           Data.String         (IsString)
 
 -- |A name for a preset for an 'Actor's stats.
 newtype StatPreset = StatPreset {
-        unStatPreset :: String
-    } deriving (Show,Eq,Ord,IsString,Hashable)
+        unStatPreset :: Int
+    } deriving (Show,Eq,Ord,Enum,Num,Hashable)
+
+instance Bounded StatPreset where
+    minBound = 1
+    maxBound = 3
 
 -- |A colletion of 'StatPreset's.
 type StatPresets = HM.HashMap StatPreset Stats
@@ -75,12 +80,13 @@ unusedStatPoints a = calcUnusedStatPoints (totalStatPoints a) c
 currentStats :: Actor -> Stats
 currentStats a = statPresets a HM.! activePreset a
 
--- |Add or overwrite the provided 'StatPreset' for the given 'Actor'.
-addPreset :: StatPreset -> Stats -> Actor -> Actor
-addPreset k v a = a { statPresets = HM.insert k v (statPresets a) }
-
-deletePreset :: StatPreset -> Actor -> Actor
-deletePreset k a = a { statPresets = HM.delete k (statPresets a) }
+-- |Add a new preset slot to an 'Actor'.
+addPreset :: Actor -> Actor
+addPreset a = a { maxPresets  = mx
+                , statPresets = hm }
+    where
+        mx = succ $ maxPresets a
+        hm = HM.insert (StatPreset $ unMaxPresets mx) baseStats $ statPresets a
 
 -- |When updating an 'Actor', the result can be either the updated 'Actor' or an
 -- error message.
@@ -89,9 +95,23 @@ type ActorUpdate = Either String Actor
 setActivePreset :: StatPreset-> Actor -> ActorUpdate
 setActivePreset k a
     | k `elem` HM.keys hm = Right $ a { activePreset = k }
-    | otherwise           = Left $ unStatPreset k <> " is not a valid preset."
+    | otherwise           = Left $ show (unStatPreset k) <> " is not a valid preset."
     where
         hm = statPresets a
+
+nextPreset :: Actor -> ActorUpdate
+nextPreset a = setActivePreset p a
+    where
+        x = unStatPreset $ activePreset a
+        y = unMaxPresets $ maxPresets a
+        p = if x == y then 1 else StatPreset (succ x)
+
+prevPreset :: Actor -> ActorUpdate
+prevPreset a = setActivePreset p a
+    where
+        x = unStatPreset $ activePreset a
+        y = unMaxPresets $ maxPresets a
+        p = if x == 1 then StatPreset y else StatPreset (pred x)
 
 setStats :: Stats -> Actor -> Actor
 setStats s a = a {  statPresets = HM.insert k s hm }
@@ -202,7 +222,7 @@ testActor :: StatPoint Total -> Actor
 testActor = Actor nom hm k mx
     where
         nom = "Test Actor"
-        k   = "default"
+        k   = 1
         s   = baseStats
-        hm  = HM.fromList [(k,s),("two",s)]
+        hm  = HM.fromList [(k,s),(2,s)]
         mx  = MaxPresets $ HM.size hm
