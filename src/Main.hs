@@ -1,8 +1,10 @@
 module Main where
 
+import           Respeced.Action()
 import           Respeced.Actor
 import           Respeced.Brick.State
 import           Respeced.Brick.View.Respec (respecScreen)
+import           Respeced.Time()
 
 import qualified Brick.Main          as M
 import           Control.Monad
