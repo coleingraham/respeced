@@ -55,7 +55,7 @@ instance Bounded StatPreset where
     maxBound = 3
 
 -- |A colletion of 'StatPreset's.
-type StatPresets = HM.HashMap StatPreset Stats
+type StatPresets = HM.HashMap StatPreset NaturalStats
 
 -- |The maximum number of 'StatPreset's allowed.
 newtype MaxPresets = MaxPresets {
@@ -77,7 +77,7 @@ unusedStatPoints a = calcUnusedStatPoints (totalStatPoints a) c
         c = currentStats a
 
 -- |Get the currently active 'Stats' from an 'Actor'.
-currentStats :: Actor -> Stats
+currentStats :: Actor -> NaturalStats
 currentStats a = statPresets a HM.! activePreset a
 
 -- |Add a new preset slot to an 'Actor'.
@@ -86,7 +86,9 @@ addPreset a = a { maxPresets  = mx
                 , statPresets = hm }
     where
         mx = succ $ maxPresets a
-        hm = HM.insert (StatPreset $ unMaxPresets mx) baseStats $ statPresets a
+        hm = HM.insert (StatPreset $ unMaxPresets mx)
+            (NaturalStats baseStats)
+            $ statPresets a
 
 -- |When updating an 'Actor', the result can be either the updated 'Actor' or an
 -- error message.
@@ -113,11 +115,26 @@ prevPreset a = setActivePreset p a
         y = unMaxPresets $ maxPresets a
         p = if x == 1 then StatPreset y else StatPreset (pred x)
 
-setStats :: Stats -> Actor -> Actor
+setStats :: NaturalStats -> Actor -> Actor
 setStats s a = a {  statPresets = HM.insert k s hm }
     where
         k  = activePreset a
         hm = statPresets a
+
+alterStat
+    :: Num a
+    => (Stats -> a)          -- ^the "getter" function
+    -> (Stats -> a -> Stats) -- ^the "setter" function
+    -> (a -> a -> a)
+    -> Actor
+    -> Actor
+alterStat getter setter op a = a { statPresets = stats' }
+    where
+        k      = activePreset a
+        hm     = statPresets a
+        stats  = unNaturalStats $ hm HM.! k
+        v      = setter stats (getter stats `op` 1)
+        stats' = HM.insert k (NaturalStats v) hm
 
 -- |If the 'Actor' has enough unused 'StatPoint's, allow them to trade one to
 -- raise a stat by one.
@@ -128,22 +145,20 @@ increaseStat
     -> Actor                 -- ^the 'Actor' to update
     -> ActorUpdate
 increaseStat getter setter a
-    | unusedStatPoints a > 0 = Right $ a {  statPresets = stats' }
+    | unusedStatPoints a > 0 = Right a' -- $ a {  statPresets = stats' }
     | otherwise              = Left "no unused stat points."
     where
-        k      = activePreset a
-        hm     = statPresets a
-        stats  = hm HM.! k
-        stats' = HM.insert k (setter stats (getter stats + 1)) hm
+        stats = unNaturalStats $ statPresets a HM.! activePreset a
+        a'    = alterStat getter setter (+) a
 
 increaseHP :: Actor -> ActorUpdate
-increaseHP = increaseStat hp (\s x -> s {hp = x})
+increaseHP = increaseStat getHP setHP
 
 increaseMP :: Actor -> ActorUpdate
-increaseMP = increaseStat mp (\s x -> s {mp = x})
+increaseMP = increaseStat getMP setMP
 
 increaseStamina :: Actor -> ActorUpdate
-increaseStamina = increaseStat stamina (\s x -> s {stamina = x})
+increaseStamina = increaseStat getStamina setStamina
 
 increasePhysicalOffense :: Actor -> ActorUpdate
 increasePhysicalOffense
@@ -174,23 +189,20 @@ decreaseStat
     -> Actor                 -- ^the 'Actor' to update
     -> ActorUpdate
 decreaseStat getter setter nom a
-    | v > 1     = Right $ a { statPresets = stats' }
-    | otherwise = Left $ nom <> " is already the lowest possible value."
+    | getter stats > 1 = Right a' -- $ a { statPresets = stats' }
+    | otherwise        = Left $ nom <> " is already the lowest possible value."
     where
-        k      = activePreset a
-        v      = getter stats
-        hm     = statPresets a
-        stats  = hm HM.! k
-        stats' = HM.insert k (setter stats (v - 1)) hm
+        stats = unNaturalStats $ statPresets a HM.! activePreset a
+        a'    = alterStat getter setter (-) a
 
 decreaseHP :: Actor -> ActorUpdate
-decreaseHP = decreaseStat hp (\s x -> s {hp = x}) "hp"
+decreaseHP = decreaseStat getHP setHP "hp"
 
 decreaseMP :: Actor -> ActorUpdate
-decreaseMP = decreaseStat mp (\s x -> s {mp = x}) "mp"
+decreaseMP = decreaseStat getMP setMP "mp"
 
 decreaseStamina :: Actor -> ActorUpdate
-decreaseStamina = decreaseStat stamina (\s x -> s {stamina = x}) "stamina"
+decreaseStamina = decreaseStat getStamina setStamina "stamina"
 
 decreasePhysicalOffense :: Actor -> ActorUpdate
 decreasePhysicalOffense
@@ -223,6 +235,6 @@ testActor = Actor nom hm k mx
     where
         nom = "Test Actor"
         k   = 1
-        s   = baseStats
+        s   = NaturalStats baseStats
         hm  = HM.fromList [(k,s),(2,s)]
         mx  = MaxPresets $ HM.size hm

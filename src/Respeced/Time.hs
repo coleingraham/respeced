@@ -76,6 +76,25 @@ isRecovered = (<= 0) . timeUntilRecovered
 isUsable :: (HasTimeProperties a) => TimedEvent a -> Bool
 isUsable = (<= 0) . timeUntilUsable
 
+class HasDuration a where
+    getRemainingTime :: a -> Tick
+    updateRemainingTime :: Tick -> a -> a
+
+    updateDuration :: a -> a
+    updateDuration a = updateRemainingTime (getRemainingTime a - 1) a
+
+    isExpired :: a -> Bool
+    isExpired = (<= 0) . getRemainingTime
+
+data Durational a = Durational {
+         getDuration :: !Tick
+        ,getItem     :: !a
+    } deriving (Show,Eq)
+
+instance HasDuration (Durational a) where
+    getRemainingTime        = getDuration
+    updateRemainingTime t a = a { getDuration = t }
+
 ----
 
 testTimeProperties :: TimeProperties

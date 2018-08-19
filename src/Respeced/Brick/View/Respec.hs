@@ -44,7 +44,7 @@ actorStatsUI rs = ui
     where
         p     = printf "%3d"
         a     = playerActor rs
-        s     = currentStats a
+        s     = unNaturalStats $ currentStats a
 
         ui    = W.hBox [left,right]
 
@@ -61,9 +61,9 @@ actorStatsUI rs = ui
         stats = B.borderWithLabel (W.str "Stats")
               $ W.vBox
               [ W.str   "                     (+/-)"
-              , W.str $ "              HP:" <> p (unHP      $ hp              s) <> " (q/Q)"
-              , W.str $ "              MP:" <> p (unMP      $ mp              s) <> " (w/W)"
-              , W.str $ "         Stamina:" <> p (unStamina $ stamina         s) <> " (e/E)"
+              , W.str $ "              HP:" <> p (unHP      $ getHP           s) <> " (q/Q)"
+              , W.str $ "              MP:" <> p (unMP      $ getMP           s) <> " (w/W)"
+              , W.str $ "         Stamina:" <> p (unStamina $ getStamina      s) <> " (e/E)"
               , W.str $ "Physical Offense:" <> p (unOffense $ physicalOffense s) <> " (r/R)"
               , W.padTop (T.Pad 1)
               $ W.str $ "Physical Defense:" <> p (unDefense $ physicalDefense s) <> " (a/A)"
@@ -148,7 +148,7 @@ handleEvent rs (T.VtyEvent (V.EvKey (V.KChar 'F') []))
 handleEvent rs (T.VtyEvent (V.EvKey (V.KChar 'z') []))
     = M.continue $ rs { playerActor = a }
     where
-        a = setStats baseStats $ playerActor rs
+        a = setStats (NaturalStats baseStats) $ playerActor rs
 
 handleEvent rs (T.VtyEvent (V.EvKey (V.KChar ',') []))
     = M.continue $ rs { playerActor = a }
