@@ -86,15 +86,6 @@ class HasDuration a where
     isExpired :: a -> Bool
     isExpired = (<= 0) . getRemainingTime
 
-data Durational a = Durational {
-         getDuration :: !Tick
-        ,getItem     :: !a
-    } deriving (Show,Eq)
-
-instance HasDuration (Durational a) where
-    getRemainingTime        = getDuration
-    updateRemainingTime t a = a { getDuration = t }
-
 ----
 
 testTimeProperties :: TimeProperties

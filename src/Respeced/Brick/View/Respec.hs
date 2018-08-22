@@ -4,6 +4,7 @@ module Respeced.Brick.View.Respec where
 
 import           Respeced.Actor
 import           Respeced.Stat
+import           Respeced.Stat.Allocation
 import           Respeced.Brick.State
 
 import qualified Brick.Main           as M
@@ -11,11 +12,6 @@ import qualified Brick.Types          as T
 import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Center as C
 import qualified Brick.Widgets.Core   as W
-import qualified Brick.Widgets.Dialog as D
-import qualified Brick.Widgets.Edit   as E
-import qualified Brick.Widgets.List   as L
-import qualified Data.HashMap.Strict  as HM
-import           Data.List
 import           Data.Monoid
 import qualified Graphics.Vty         as V
 import           Text.Printf          (printf)
@@ -42,9 +38,9 @@ drawUI rs = [ui]
 actorStatsUI :: RespecState -> T.Widget View
 actorStatsUI rs = ui
     where
-        p     = printf "%3d"
+        p     = printf "%3d" . getSum
         a     = playerActor rs
-        s     = unNaturalStats $ currentStats a
+        s     = currentStats a
 
         ui    = W.hBox [left,right]
 
@@ -89,13 +85,6 @@ handleEvent
     -> T.EventM View (T.Next RespecState)
 handleEvent rs (T.VtyEvent (V.EvKey V.KEsc []))
     = M.halt (setScreen Exit rs)
-
-handleEvent rs (T.VtyEvent (V.EvKey (V.KChar '>') []))
-    = M.continue rs
-    where
-        a  = playerActor rs
-        p  = activePreset a
-        ps = sort $ delete p $ HM.keys $ statPresets a
 
 handleEvent rs (T.VtyEvent (V.EvKey (V.KChar 'q') []))
     = M.continue $ updateStat increaseHP rs
@@ -148,7 +137,7 @@ handleEvent rs (T.VtyEvent (V.EvKey (V.KChar 'F') []))
 handleEvent rs (T.VtyEvent (V.EvKey (V.KChar 'z') []))
     = M.continue $ rs { playerActor = a }
     where
-        a = setStats (NaturalStats baseStats) $ playerActor rs
+        a = setStats baseStats $ playerActor rs
 
 handleEvent rs (T.VtyEvent (V.EvKey (V.KChar ',') []))
     = M.continue $ rs { playerActor = a }

@@ -39,11 +39,11 @@ module Respeced.Actor (
 ) where
 
 import           Respeced.Stat
+import           Respeced.Stat.Allocation
 
 import           Data.Hashable       (Hashable)
 import qualified Data.HashMap.Strict as HM
 import           Data.Monoid
-import           Data.String         (IsString)
 
 -- |A name for a preset for an 'Actor's stats.
 newtype StatPreset = StatPreset {
@@ -55,7 +55,7 @@ instance Bounded StatPreset where
     maxBound = 3
 
 -- |A colletion of 'StatPreset's.
-type StatPresets = HM.HashMap StatPreset NaturalStats
+type StatPresets = HM.HashMap StatPreset (Stats Natural)
 
 -- |The maximum number of 'StatPreset's allowed.
 newtype MaxPresets = MaxPresets {
@@ -77,7 +77,7 @@ unusedStatPoints a = calcUnusedStatPoints (totalStatPoints a) c
         c = currentStats a
 
 -- |Get the currently active 'Stats' from an 'Actor'.
-currentStats :: Actor -> NaturalStats
+currentStats :: Actor -> Stats Natural
 currentStats a = statPresets a HM.! activePreset a
 
 -- |Add a new preset slot to an 'Actor'.
@@ -86,9 +86,7 @@ addPreset a = a { maxPresets  = mx
                 , statPresets = hm }
     where
         mx = succ $ maxPresets a
-        hm = HM.insert (StatPreset $ unMaxPresets mx)
-            (NaturalStats baseStats)
-            $ statPresets a
+        hm = HM.insert (StatPreset $ unMaxPresets mx) baseStats $ statPresets a
 
 -- |When updating an 'Actor', the result can be either the updated 'Actor' or an
 -- error message.
@@ -115,7 +113,7 @@ prevPreset a = setActivePreset p a
         y = unMaxPresets $ maxPresets a
         p = if x == 1 then StatPreset y else StatPreset (pred x)
 
-setStats :: NaturalStats -> Actor -> Actor
+setStats :: Stats Natural -> Actor -> Actor
 setStats s a = a {  statPresets = HM.insert k s hm }
     where
         k  = activePreset a
@@ -123,8 +121,8 @@ setStats s a = a {  statPresets = HM.insert k s hm }
 
 alterStat
     :: Num a
-    => (Stats -> a)          -- ^the "getter" function
-    -> (Stats -> a -> Stats) -- ^the "setter" function
+    => (Stats Natural -> a)                  -- ^the "getter" function
+    -> (Stats Natural -> a -> Stats Natural) -- ^the "setter" function
     -> (a -> a -> a)
     -> Actor
     -> Actor
@@ -132,24 +130,23 @@ alterStat getter setter op a = a { statPresets = stats' }
     where
         k      = activePreset a
         hm     = statPresets a
-        stats  = unNaturalStats $ hm HM.! k
+        stats  = hm HM.! k
         v      = setter stats (getter stats `op` 1)
-        stats' = HM.insert k (NaturalStats v) hm
+        stats' = HM.insert k v hm
 
 -- |If the 'Actor' has enough unused 'StatPoint's, allow them to trade one to
 -- raise a stat by one.
 increaseStat
     :: Num a
-    => (Stats -> a)          -- ^the "getter" function
-    -> (Stats -> a -> Stats) -- ^the "setter" function
-    -> Actor                 -- ^the 'Actor' to update
+    => (Stats Natural -> a)                  -- ^the "getter" function
+    -> (Stats Natural -> a -> Stats Natural) -- ^the "setter" function
+    -> Actor                                 -- ^the 'Actor' to update
     -> ActorUpdate
 increaseStat getter setter a
-    | unusedStatPoints a > 0 = Right a' -- $ a {  statPresets = stats' }
+    | unusedStatPoints a > 0 = Right a'
     | otherwise              = Left "no unused stat points."
     where
-        stats = unNaturalStats $ statPresets a HM.! activePreset a
-        a'    = alterStat getter setter (+) a
+        a' = alterStat getter setter (+) a
 
 increaseHP :: Actor -> ActorUpdate
 increaseHP = increaseStat getHP setHP
@@ -183,16 +180,16 @@ increaseSpeed = increaseStat speed (\s x -> s {speed = x})
 -- for an unused 'StatPoint'.
 decreaseStat
     :: (Num a,Ord a)
-    => (Stats -> a)          -- ^the "getter" function
-    -> (Stats -> a -> Stats) -- ^the "setter" function
-    -> String                -- ^the name of the stat to be displayed for an error
-    -> Actor                 -- ^the 'Actor' to update
+    => (Stats Natural -> a)                  -- ^the "getter" function
+    -> (Stats Natural -> a -> Stats Natural) -- ^the "setter" function
+    -> String                                -- ^the name of the stat to be displayed for an error
+    -> Actor                                 -- ^the 'Actor' to update
     -> ActorUpdate
 decreaseStat getter setter nom a
     | getter stats > 1 = Right a' -- $ a { statPresets = stats' }
     | otherwise        = Left $ nom <> " is already the lowest possible value."
     where
-        stats = unNaturalStats $ statPresets a HM.! activePreset a
+        stats = statPresets a HM.! activePreset a
         a'    = alterStat getter setter (-) a
 
 decreaseHP :: Actor -> ActorUpdate
@@ -235,6 +232,6 @@ testActor = Actor nom hm k mx
     where
         nom = "Test Actor"
         k   = 1
-        s   = NaturalStats baseStats
+        s   = baseStats
         hm  = HM.fromList [(k,s),(2,s)]
         mx  = MaxPresets $ HM.size hm

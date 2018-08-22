@@ -35,3 +35,6 @@ executable respeced
                        -fexcess-precision
                        -optc-O3
                        -optc-ffast-math
+                       -Wall
+                       -fno-warn-orphans
+                       -Wno-incomplete-patterns
